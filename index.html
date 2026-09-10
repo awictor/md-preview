@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MdPreview — live Markdown to HTML previewer</title>
+<meta name="description" content="Free offline Markdown previewer. Type Markdown and see the rendered HTML live, then copy the HTML. Supports headings, bold, italic, code, links, images, lists, blockquotes, and fenced code. Works offline, no signup.">
+<link rel="canonical" href="https://awictor.github.io/md-preview/">
+<style>
+  :root{
+    --c:#1e3a8a; --bg:#f6f8fc; --fg:#141b2e; --muted:#5a6683;
+    --card:#ffffff; --border:#dee5f0; --code:#eef2f9;
+  }
+  [data-theme="dark"]{
+    --bg:#0d111c; --fg:#e6ebf5; --muted:#8b98b5; --card:#151b2b;
+    --border:#25304a; --code:#1a2236;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  header{max-width:1040px;margin:0 auto;padding:24px 20px 6px;
+    display:flex;align-items:center;gap:12px}
+  .logo{width:38px;height:38px;border-radius:10px;flex:none;
+    background:linear-gradient(135deg,var(--c),#3b82f6);
+    display:grid;place-items:center;color:#fff;font-size:19px;font-weight:700}
+  h1{font-size:1.35rem;margin:0}
+  .sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+  .theme{margin-left:auto;background:none;border:1px solid var(--border);
+    color:var(--fg);border-radius:9px;padding:7px 11px;cursor:pointer;font-size:1rem}
+  main{max-width:1040px;margin:0 auto;padding:6px 20px 60px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .pane{background:var(--card);border:1px solid var(--border);border-radius:14px;
+    display:flex;flex-direction:column;overflow:hidden}
+  .pane .bar{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);
+    font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .copy{margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);
+    border-radius:7px;padding:3px 11px;cursor:pointer;font-size:.72rem;text-transform:none;letter-spacing:0}
+  .copy:hover{color:var(--c);border-color:var(--c)}
+  textarea{border:none;background:none;color:var(--fg);resize:vertical;min-height:420px;
+    padding:15px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem;line-height:1.6;width:100%}
+  textarea:focus{outline:none}
+  .render{padding:6px 18px 18px;min-height:420px;overflow-x:auto}
+  .render h1,.render h2,.render h3{line-height:1.25}
+  .render h1{border-bottom:1px solid var(--border);padding-bottom:.2em}
+  .render code{background:var(--code);padding:.15em .4em;border-radius:5px;
+    font-family:ui-monospace,monospace;font-size:.9em}
+  .render pre{background:var(--code);padding:13px 15px;border-radius:10px;overflow-x:auto}
+  .render pre code{background:none;padding:0}
+  .render blockquote{border-left:4px solid var(--c);margin:1em 0;padding:.2em 1em;color:var(--muted)}
+  .render a{color:var(--c)}
+  .render img{max-width:100%}
+  .render hr{border:none;border-top:1px solid var(--border);margin:1.4em 0}
+  .render table{border-collapse:collapse}
+  footer{max-width:1040px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:.84rem}
+  footer a{color:var(--c)}
+</style>
+</head>
+<body>
+<script>
+  (function(){var t=localStorage.getItem('mdp.theme');
+   if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))
+     document.documentElement.setAttribute('data-theme','dark');})();
+</script>
+<header>
+  <div class="logo">↓</div>
+  <div>
+    <h1>MdPreview</h1>
+    <p class="sub">Live Markdown &rarr; HTML previewer</p>
+  </div>
+  <button class="theme" id="theme" title="Toggle theme">🌙</button>
+</header>
+<main>
+  <div class="grid">
+    <div class="pane">
+      <div class="bar">Markdown</div>
+      <textarea id="in" spellcheck="false"># Hello, Markdown
+
+A **live** previewer with _no_ dependencies.
+
+- Lists
+- `inline code`
+- [Links](https://awictor.github.io/toolkit/)
+
+> Blockquotes too.
+
+```js
+const answer = 42;
+```</textarea>
+    </div>
+    <div class="pane">
+      <div class="bar">Preview <button class="copy" id="copy">Copy HTML</button></div>
+      <div class="render" id="out"></div>
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:.82rem;margin-top:14px">
+    Supports headings, <b>bold</b>, <i>italic</i>, inline &amp; fenced code, links, images,
+    ordered/unordered lists, blockquotes, and horizontal rules. Text is HTML-escaped, so raw
+    HTML is shown literally. Everything runs locally.</p>
+</main>
+<footer>
+  MdPreview is part of the <a href="https://awictor.github.io/toolkit/">Toolkit</a> —
+  free, offline, no signup. · <a href="https://github.com/awictor/md-preview">Source</a>
+</footer>
+
+<script>
+// ---- pure functions ----
+function escapeHtml(s){
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function inline(text){
+  var codes = [];
+  // protect inline code spans first
+  text = text.replace(/`([^`]+)`/g, function(_, c){
+    codes.push('<code>' + escapeHtml(c) + '</code>');
+    return '' + (codes.length - 1) + '';
+  });
+  text = escapeHtml(text);
+  // images before links
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img src="$2" alt="$1">');
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
+  // bold, then italic
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  text = text.replace(/\b_([^_]+)_\b/g, '<em>$1</em>');
+  // restore protected code spans
+  text = text.replace(/(\d+)/g, function(_, i){ return codes[+i]; });
+  return text;
+}
+function mdToHtml(md){
+  var lines = String(md).replace(/\r\n?/g, '\n').split('\n');
+  var out = [], i = 0;
+  var isBlank = function(l){ return /^\s*$/.test(l); };
+  var isHeading = function(l){ return /^(#{1,6})\s+/.test(l); };
+  var isFence = function(l){ return /^```/.test(l); };
+  var isQuote = function(l){ return /^\s*>/.test(l); };
+  var isUl = function(l){ return /^\s*[-*+]\s+/.test(l); };
+  var isOl = function(l){ return /^\s*\d+\.\s+/.test(l); };
+  var isHr = function(l){ return /^\s*([-*_])\1{2,}\s*$/.test(l); };
+  while(i < lines.length){
+    var line = lines[i];
+    var fence = line.match(/^```(.*)$/);
+    if(fence){
+      var lang = fence[1].trim(), buf = [];
+      i++;
+      while(i < lines.length && !isFence(lines[i])){ buf.push(lines[i]); i++; }
+      i++;
+      out.push('<pre><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' +
+        escapeHtml(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    if(isBlank(line)){ i++; continue; }
+    var h = line.match(/^(#{1,6})\s+(.*)$/);
+    if(h){ var lvl = h[1].length; out.push('<h' + lvl + '>' + inline(h[2].trim()) + '</h' + lvl + '>'); i++; continue; }
+    if(isHr(line)){ out.push('<hr>'); i++; continue; }
+    if(isQuote(line)){
+      var qb = [];
+      while(i < lines.length && isQuote(lines[i])){ qb.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+      out.push('<blockquote>' + mdToHtml(qb.join('\n')) + '</blockquote>');
+      continue;
+    }
+    if(isUl(line)){
+      var items = [];
+      while(i < lines.length && isUl(lines[i])){ items.push(lines[i].replace(/^\s*[-*+]\s+/, '')); i++; }
+      out.push('<ul>' + items.map(function(t){ return '<li>' + inline(t) + '</li>'; }).join('') + '</ul>');
+      continue;
+    }
+    if(isOl(line)){
+      var oi = [];
+      while(i < lines.length && isOl(lines[i])){ oi.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++; }
+      out.push('<ol>' + oi.map(function(t){ return '<li>' + inline(t) + '</li>'; }).join('') + '</ol>');
+      continue;
+    }
+    var para = [];
+    while(i < lines.length && !isBlank(lines[i]) && !isHeading(lines[i]) && !isFence(lines[i]) &&
+          !isQuote(lines[i]) && !isUl(lines[i]) && !isOl(lines[i]) && !isHr(lines[i])){
+      para.push(lines[i]); i++;
+    }
+    out.push('<p>' + inline(para.join(' ')) + '</p>');
+  }
+  return out.join('\n');
+}
+
+if(typeof module !== 'undefined') module.exports = { escapeHtml, inline, mdToHtml };
+
+// ---- UI ----
+if(typeof document !== 'undefined' && document.getElementById){
+  var inEl = document.getElementById('in');
+  var outEl = document.getElementById('out');
+  function render(){
+    outEl.innerHTML = mdToHtml(inEl.value);
+    try{ localStorage.setItem('mdp.in', inEl.value); }catch(e){}
+  }
+  inEl.addEventListener('input', render);
+  document.getElementById('copy').addEventListener('click', function(){
+    if(navigator.clipboard) navigator.clipboard.writeText(mdToHtml(inEl.value));
+    this.textContent = 'Copied';
+    var b = this; setTimeout(function(){ b.textContent = 'Copy HTML'; }, 1000);
+  });
+  try{ var s = localStorage.getItem('mdp.in'); if(s !== null) inEl.value = s; }catch(e){}
+  render();
+
+  var themeBtn = document.getElementById('theme');
+  function syncIcon(){
+    themeBtn.textContent =
+      document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+  }
+  syncIcon();
+  themeBtn.addEventListener('click', function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if(dark){ document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('mdp.theme','light'); }
+    else { document.documentElement.setAttribute('data-theme','dark');
+      localStorage.setItem('mdp.theme','dark'); }
+    syncIcon();
+  });
+}
+</script>
+</body>
+</html>
